@@ -1,74 +1,70 @@
+using System.Collections;
 using UnityEngine;
-using UnityEngine.Events;
 
 [RequireComponent(typeof(Animator))]
 public class EnemyMover : MonoBehaviour
 {
     private const string Speed = "Speed";
 
-    private Transform[] _route;
-    private Transform _targetPoint;
+    private Transform _target;
     private Animator _animator;
-    private float _movementSpeed;
-    private int _nextPointIndex;
-
-    private event UnityAction MovementUpdate;
+    private float _moveSpeed;
+    private float _followingDistance;
 
     private void Start()
     {
         _animator = GetComponent<Animator>();
-        _nextPointIndex = 0;
-        _targetPoint = _route[_nextPointIndex];
+        _followingDistance = 1.9f;
 
-        MovementUpdate += Move;
-        MovementUpdate += Rotate;
+        StartCoroutine(Movement());
     }
 
-    private void LateUpdate()
+    public void SetTarget(Transform target)
     {
-        MovementUpdate?.Invoke();
+        _target = target;
     }
 
     public void SetSpeed(float speed)
     {
-        _movementSpeed = speed;
-    }
-
-    public void SetRoute(Transform[] route)
-    {
-        _route = route;
+        _moveSpeed = speed;
     }
 
     private void Rotate()
     {
-        transform.LookAt(_targetPoint.position);
-    }
-
-    private void Stop()
-    {
-        MovementUpdate -= Move;
-        MovementUpdate -= Rotate;
+        Vector3 direction = (_target.position - transform.position).normalized;
+        direction.y = 0;
+        transform.forward = direction;
     }
 
     private void Move()
     {
-        transform.position = Vector3.MoveTowards(transform.position, _targetPoint.position, _movementSpeed * Time.deltaTime);
+        _animator.SetFloat(Speed, _moveSpeed);
+        transform.Translate(Vector3.forward * _moveSpeed * Time.deltaTime);
+    }
 
-        if (transform.position == _targetPoint.position)
+    private IEnumerator Movement()
+    {
+        const float Second = 0.2f;
+
+        var wait = new WaitForSeconds(Second);
+
+        while (true)
         {
-            _nextPointIndex++;
+            Move();
+            Rotate();
 
-            if (_nextPointIndex < _route.Length)
+            float distance = Vector3.Distance(transform.position, _target.position);
+
+            if (distance <= _followingDistance)
             {
-                _targetPoint = _route[_nextPointIndex];
+                _animator.SetFloat(Speed, 0);
+
+                yield return wait;
+
+                _animator.SetFloat(Speed, _moveSpeed);
             }
-            else
-            {
-                _movementSpeed = 0;
-                Stop();
-            }
+
+            yield return null;
         }
-
-        _animator.SetFloat(Speed, _movementSpeed);
     }
 }
